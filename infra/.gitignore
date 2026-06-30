@@ -1,0 +1,11 @@
+# Local state & overrides
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+
+
+# Commit .terraform.lock.hcl (do NOT ignore it)
