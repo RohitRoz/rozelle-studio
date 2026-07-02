@@ -56,3 +56,9 @@ variable "athena_results_expiration_days" {
   type        = number
   default     = 30
 }
+
+variable "athena_bytes_scanned_cutoff" {
+  description = "Per-query scan limit (bytes) in the pipeline workgroup; kills runaway full scans. Athena bills per byte scanned."
+  type        = number
+  default     = 10737418240 # 10 GB
+}

@@ -38,6 +38,11 @@ output "project_kms_key_alias" {
   value       = aws_kms_alias.bronze.name
 }
 
+output "athena_workgroup_name" {
+  description = "Athena workgroup for pipeline queries (dbt profiles work_group)."
+  value       = aws_athena_workgroup.pipeline.name
+}
+
 output "glue_database_names" {
   description = "Glue Catalog database per dbt layer (staging/intermediate/marts)."
   value       = { for k, db in aws_glue_catalog_database.layers : k => db.name }
