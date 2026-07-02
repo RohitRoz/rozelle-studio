@@ -44,3 +44,15 @@ variable "bronze_noncurrent_expiration_days" {
   type        = number
   default     = 90
 }
+
+variable "access_log_retention_days" {
+  description = "Days after which S3 server access logs expire from the log bucket."
+  type        = number
+  default     = 365
+}
+
+variable "athena_results_expiration_days" {
+  description = "Days after which Athena query results expire. Results are re-runnable scratch output."
+  type        = number
+  default     = 30
+}
