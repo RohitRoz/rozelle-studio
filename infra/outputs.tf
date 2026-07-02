@@ -38,6 +38,11 @@ output "project_kms_key_alias" {
   value       = aws_kms_alias.bronze.name
 }
 
+output "glue_database_names" {
+  description = "Glue Catalog database per dbt layer (staging/intermediate/marts)."
+  value       = { for k, db in aws_glue_catalog_database.layers : k => db.name }
+}
+
 output "logs_bucket_name" {
   description = "Name of the S3 server-access-log bucket (SSE-S3)."
   value       = aws_s3_bucket.logs.id
