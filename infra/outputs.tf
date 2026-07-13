@@ -38,6 +38,16 @@ output "project_kms_key_alias" {
   value       = aws_kms_alias.bronze.name
 }
 
+output "dbt_role_arn" {
+  description = "ARN of the dbt transform role (assume for dbt runs; LF grantee in 5b)."
+  value       = aws_iam_role.dbt.arn
+}
+
+output "worker_role_arn" {
+  description = "ARN of the ingestion worker role."
+  value       = aws_iam_role.worker.arn
+}
+
 output "lf_registration_role_arn" {
   description = "ARN of the Lake Formation credential-vending role for the lakehouse location."
   value       = aws_iam_role.lf_register.arn
