@@ -5,20 +5,18 @@
 # Account+region singleton. REPLACES the whole settings object on apply — the
 # admins list must always include the principal running Terraform, or LF
 # administration (including this config) locks itself out.
+#
+# Phase 5b — enforcement is imperative, documented here because it can't be
+# Terraform state:
+#  1. The provider treats omitted default-permission blocks as computed (keep
+#     existing), so full-LF-mode defaults were set via
+#     `aws lakeformation put-data-lake-settings` with empty
+#     CreateDatabase/CreateTableDefaultPermissions (admins list preserved).
+#  2. Pre-existing per-database open-door grants were revoked:
+#     aws lakeformation revoke-permissions --principal DataLakePrincipalIdentifier=IAM_ALLOWED_PRINCIPALS \
+#       --permissions ALL --resource '{"Database":{"Name":"<db>"}}'
 resource "aws_lakeformation_data_lake_settings" "this" {
   admins = [data.aws_caller_identity.current.arn]
-
-  # Keep hybrid mode: new databases/tables stay reachable via plain IAM.
-  # Omitting these blocks would silently flip new objects to LF-enforced.
-  create_database_default_permissions {
-    principal   = "IAM_ALLOWED_PRINCIPALS"
-    permissions = ["ALL"]
-  }
-
-  create_table_default_permissions {
-    principal   = "IAM_ALLOWED_PRINCIPALS"
-    permissions = ["ALL"]
-  }
 }
 
 # Custom registration role. The service-linked role can't be used here: it has
@@ -103,4 +101,64 @@ resource "aws_lakeformation_resource" "lakehouse" {
   # IAM policy attachment is eventually consistent; make sure the role can
   # actually be validated/assumed by LF at registration time.
   depends_on = [aws_iam_role_policy.lf_register]
+}
+
+# --- Phase 5b: grants (Gate 2 access) ----------------------------------------
+# Grantees: the dbt role (transform) and the deployer user. LF admins can
+# manage grants but get NO implicit data access — without the deployer grants,
+# admin smoke tests would fail once IAM_ALLOWED_PRINCIPALS is revoked.
+# The worker role gets nothing: it never touches the catalog.
+
+locals {
+  lf_grantees = {
+    dbt      = aws_iam_role.dbt.arn
+    deployer = data.aws_caller_identity.current.arn
+  }
+
+  # principal × database pairs for the two per-database grant sets
+  lf_grants = {
+    for pair in setproduct(keys(local.lf_grantees), keys(aws_glue_catalog_database.layers)) :
+    "${pair[0]}-${pair[1]}" => {
+      principal = local.lf_grantees[pair[0]]
+      database  = aws_glue_catalog_database.layers[pair[1]].name
+    }
+  }
+}
+
+# Database-level: create/manage tables within the three layer namespaces.
+resource "aws_lakeformation_permissions" "database" {
+  for_each = local.lf_grants
+
+  principal   = each.value.principal
+  permissions = ["CREATE_TABLE", "ALTER", "DROP", "DESCRIBE"]
+
+  database {
+    name = each.value.database
+  }
+}
+
+# Table-level (wildcard = all current and future tables in the database).
+# MERGE compiles to INSERT + DELETE under Iceberg semantics.
+resource "aws_lakeformation_permissions" "tables" {
+  for_each = local.lf_grants
+
+  principal   = each.value.principal
+  permissions = ["SELECT", "INSERT", "DELETE", "ALTER", "DROP", "DESCRIBE"]
+
+  table {
+    database_name = each.value.database
+    wildcard      = true
+  }
+}
+
+# Creating tables that point at governed S3 requires explicit location access.
+resource "aws_lakeformation_permissions" "data_location" {
+  for_each = local.lf_grantees
+
+  principal   = each.value
+  permissions = ["DATA_LOCATION_ACCESS"]
+
+  data_location {
+    arn = aws_lakeformation_resource.lakehouse.arn
+  }
 }
