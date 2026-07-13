@@ -38,6 +38,11 @@ output "project_kms_key_alias" {
   value       = aws_kms_alias.bronze.name
 }
 
+output "lf_registration_role_arn" {
+  description = "ARN of the Lake Formation credential-vending role for the lakehouse location."
+  value       = aws_iam_role.lf_register.arn
+}
+
 output "athena_workgroup_name" {
   description = "Athena workgroup for pipeline queries (dbt profiles work_group)."
   value       = aws_athena_workgroup.pipeline.name
